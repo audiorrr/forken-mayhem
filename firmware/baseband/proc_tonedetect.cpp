@@ -98,10 +98,12 @@ static constexpr float CARRIER_DETECT_THRESHOLD = 0.20f;
 // Pure CTCSS at 5% amplitude over 960 samples → energy ≈ (0.05 × 480)² = 576.
 static constexpr float CTCSS_ENERGY_THRESHOLD = 30.0f;
 
-void ToneDetectProcessor::configure(uint8_t squelch, uint32_t ctcss_f_x10) {
+void ToneDetectProcessor::configure(uint8_t squelch, uint32_t ctcss_f_x10, uint32_t new_dtcs_word, bool new_dtcs_reverse) {
     configured = false;
     user_squelch_level = squelch;
     ctcss_freq_x10 = ctcss_f_x10;
+    dtcs_word = new_dtcs_word & 0x007FFFFF;
+    dtcs_reverse = new_dtcs_reverse;
 
     decim_0.configure(taps_11k0_decim_0.taps);
     decim_1.configure(taps_11k0_decim_1.taps);
@@ -144,12 +146,69 @@ void ToneDetectProcessor::configure(uint8_t squelch, uint32_t ctcss_f_x10) {
     window_sample_count = 0;
     was_ctcss_detected = false;
     tone_duration_windows = 0;
+    dtcs_shift_register = 0;
+    dtcs_bits_collected = 0;
+    dtcs_bit_phase = 0.0f;
+    dtcs_bit_integral = 0.0f;
+    dtcs_matching_words = 0;
+    dtcs_hold_windows = 0;
+    dtcs_match_in_window = false;
     squelch_is_open = false;
     squelch_hold = 0;
     carrier_is_open = false;
     carrier_hold = 0;
 
     configured = true;
+}
+
+static uint32_t reverse_dcs_bits(uint32_t word) {
+    uint32_t reversed = 0;
+    for (size_t i = 0; i < 23; i++) {
+        reversed = (reversed << 1) | ((word >> i) & 1U);
+    }
+    return reversed;
+}
+
+void update_dtcs_decoder(
+    const float sample,
+    uint32_t& shift_register,
+    uint8_t& bits_collected,
+    float& bit_phase,
+    float& bit_integral,
+    uint8_t& matching_words,
+    uint8_t& hold_windows,
+    bool& match_in_window,
+    const uint32_t configured_word,
+    const bool reverse_polarity) {
+    constexpr float BIT_RATE = 134.4f;
+    constexpr float SAMPLE_RATE = 24000.0f;
+    constexpr uint32_t WORD_MASK = 0x007FFFFF;
+
+    bit_integral += sample;
+    bit_phase += BIT_RATE / SAMPLE_RATE;
+    if (bit_phase < 1.0f)
+        return;
+
+    bit_phase -= 1.0f;
+    const uint32_t bit = bit_integral >= 0.0f ? 1U : 0U;
+    bit_integral = 0.0f;
+    shift_register = ((shift_register << 1) | bit) & WORD_MASK;
+    if (bits_collected < 23) {
+        bits_collected++;
+        return;
+    }
+
+    const uint32_t expected = reverse_polarity ? ((~configured_word) & WORD_MASK) : configured_word;
+    const bool word_match = shift_register == expected || shift_register == reverse_dcs_bits(expected);
+    if (word_match) {
+        matching_words = matching_words < 3 ? matching_words + 1 : matching_words;
+        if (matching_words >= 2) {
+            hold_windows = 4;
+            match_in_window = true;
+        }
+    } else {
+        matching_words = 0;
+    }
 }
 
 void ToneDetectProcessor::execute(const buffer_c8_t& buffer) {
@@ -194,6 +253,20 @@ void ToneDetectProcessor::execute(const buffer_c8_t& buffer) {
     for (size_t i = 0; i < audio_buf.count; i++) {
         const float s = audio_buf.p[i];
 
+        if (dtcs_word > 0) {
+            update_dtcs_decoder(
+                s,
+                dtcs_shift_register,
+                dtcs_bits_collected,
+                dtcs_bit_phase,
+                dtcs_bit_integral,
+                dtcs_matching_words,
+                dtcs_hold_windows,
+                dtcs_match_in_window,
+                dtcs_word,
+                dtcs_reverse);
+        }
+
         // Mute audio output when FM squelch is closed (does not affect Goertzel).
         if (!squelch_is_open) audio_buf.p[i] = 0.0f;
 
@@ -231,6 +304,11 @@ void ToneDetectProcessor::execute(const buffer_c8_t& buffer) {
                 gate_open = carrier_is_open && (power > CTCSS_ENERGY_THRESHOLD);
                 goertzel_s1 = 0.0f;
                 goertzel_s2 = 0.0f;
+            } else if (dtcs_word > 0) {
+                gate_open = carrier_is_open && (dtcs_hold_windows > 0);
+                if (!dtcs_match_in_window && dtcs_hold_windows > 0)
+                    dtcs_hold_windows--;
+                dtcs_match_in_window = false;
             } else {
                 gate_open = carrier_is_open;
             }
@@ -280,7 +358,7 @@ void ToneDetectProcessor::execute(const buffer_c8_t& buffer) {
                 tone_duration_windows++;
                 was_ctcss_detected = true;
 
-                data_message.freq_hz = win_freq_hz;
+                data_message.freq_hz = dtcs_word > 0 ? 134 : win_freq_hz;
                 data_message.duration_ms = tone_duration_windows * WINDOW_MS;
                 data_message.tone_end = false;
                 shared_memory.application_queue.push(data_message);
@@ -306,7 +384,7 @@ void ToneDetectProcessor::on_message(const Message* const p) {
     switch (p->id) {
         case Message::ID::ToneDetectConfig: {
             const auto& msg = *reinterpret_cast<const ToneDetectConfigureMessage*>(p);
-            configure(msg.squelch_level, msg.ctcss_freq_x10);
+            configure(msg.squelch_level, msg.ctcss_freq_x10, msg.dtcs_word, msg.dtcs_reverse);
             break;
         }
         case Message::ID::NBFMConfigure: {

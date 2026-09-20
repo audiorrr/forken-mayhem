@@ -1092,7 +1092,9 @@ class AudioTXConfigMessage : public Message {
         const bool am_enabled,
         const bool dsb_enabled,
         const bool usb_enabled,
-        const bool lsb_enabled)
+        const bool lsb_enabled,
+        const uint32_t dtcs_word = 0,
+        const bool dtcs_reverse = false)
         : Message{ID::AudioTXConfig},
           divider(divider),
           deviation_hz(deviation_hz),
@@ -1104,7 +1106,9 @@ class AudioTXConfigMessage : public Message {
           am_enabled(am_enabled),
           dsb_enabled(dsb_enabled),
           usb_enabled(usb_enabled),
-          lsb_enabled(lsb_enabled) {
+          lsb_enabled(lsb_enabled),
+          dtcs_word(dtcs_word),
+          dtcs_reverse(dtcs_reverse) {
     }
 
     const uint32_t divider;
@@ -1118,6 +1122,8 @@ class AudioTXConfigMessage : public Message {
     const bool dsb_enabled;
     const bool usb_enabled;
     const bool lsb_enabled;
+    const uint32_t dtcs_word;
+    const bool dtcs_reverse;
 };
 
 class SigGenConfigMessage : public Message {
@@ -1913,12 +1919,20 @@ class ToneDetectDataMessage : public Message {
 // Sent M4→M0: configure the tone detector
 class ToneDetectConfigureMessage : public Message {
    public:
-    constexpr ToneDetectConfigureMessage(uint8_t squelch = 0, uint32_t ctcss_freq_x10 = 0)
+    constexpr ToneDetectConfigureMessage(
+        uint8_t squelch = 0,
+        uint32_t ctcss_freq_x10 = 0,
+        uint32_t dtcs_word = 0,
+        bool dtcs_reverse = false)
         : Message{ID::ToneDetectConfig},
           squelch_level{squelch},
-          ctcss_freq_x10{ctcss_freq_x10} {}
+          ctcss_freq_x10{ctcss_freq_x10},
+          dtcs_word{dtcs_word},
+          dtcs_reverse{dtcs_reverse} {}
     uint8_t squelch_level{0};
     uint32_t ctcss_freq_x10{0};  // CTCSS frequency × 10 (e.g. 1000 = 100.0 Hz); 0 = None
+    uint32_t dtcs_word{0};       // Complete 23-bit DCS word; 0 = disabled
+    bool dtcs_reverse{false};
 };
 
 class VorRxConfigureMessage : public Message {

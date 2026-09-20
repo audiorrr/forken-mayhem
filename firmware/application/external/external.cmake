@@ -368,6 +368,14 @@ set(EXTCPPSRC
 	external/two_tone_rx/main.cpp
 	external/two_tone_rx/ui_two_tone_rx.cpp
 
+	#retevis_rx
+	external/retevis_rx/main.cpp
+	external/retevis_rx/ui_retevis_rx.cpp
+
+	#table_scan_rx
+	external/table_scan_rx/main.cpp
+	external/table_scan_rx/ui_table_scan_rx.cpp
+
 	#hard_reset
 	external/hard_reset/main.cpp
 	external/hard_reset/ui_hard_reset.cpp
@@ -501,6 +509,8 @@ set(EXTAPPLIST
 	p25_tx
 	two_tone_pager
 	two_tone_rx
+	retevis_rx
+	table_scan_rx
 	hard_reset
 	secplustx
   signal_hunter

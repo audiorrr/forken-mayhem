@@ -253,7 +253,9 @@ void set_audiotx_config(
     const bool am_enabled,
     const bool dsb_enabled,
     const bool usb_enabled,
-    const bool lsb_enabled) {
+    const bool lsb_enabled,
+    const uint32_t dtcs_word,
+    const bool dtcs_reverse) {
     const AudioTXConfigMessage message{
         divider,
         deviation_hz,
@@ -265,7 +267,9 @@ void set_audiotx_config(
         am_enabled,
         dsb_enabled,
         usb_enabled,
-        lsb_enabled};
+        lsb_enabled,
+        dtcs_word,
+        dtcs_reverse};
     send_message(&message);
 }
 
@@ -408,8 +412,8 @@ void set_moreserx_config(uint8_t mode) {
     send_message(&message);
 }
 
-void set_tonedetect_config(uint8_t squelch, uint32_t ctcss_freq_x10) {
-    const ToneDetectConfigureMessage message{squelch, ctcss_freq_x10};
+void set_tonedetect_config(uint8_t squelch, uint32_t ctcss_freq_x10, uint32_t dtcs_word, bool dtcs_reverse) {
+    const ToneDetectConfigureMessage message{squelch, ctcss_freq_x10, dtcs_word, dtcs_reverse};
     send_message(&message);
 }
 

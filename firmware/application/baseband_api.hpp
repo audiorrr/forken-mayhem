@@ -77,7 +77,7 @@ void kill_tone();
 void set_sstv_data(const uint8_t vis_code, const uint32_t pixel_duration);
 void set_sstvrx_data(const uint8_t code);
 void set_sstvrx_phase_slant(const int16_t phase, const int16_t slant);
-void set_audiotx_config(const uint32_t divider, const float deviation_hz, const float audio_gain, uint8_t audio_shift_bits_s16, uint8_t bits_per_sample, const uint32_t tone_key_delta, const bool am_enabled, const bool dsb_enabled, const bool usb_enabled, const bool lsb_enabled);
+void set_audiotx_config(const uint32_t divider, const float deviation_hz, const float audio_gain, uint8_t audio_shift_bits_s16, uint8_t bits_per_sample, const uint32_t tone_key_delta, const bool am_enabled, const bool dsb_enabled, const bool usb_enabled, const bool lsb_enabled, const uint32_t dtcs_word = 0, const bool dtcs_reverse = false);
 void set_fifo_data(const int8_t* data);
 void set_pitch_rssi(int32_t avg, bool enabled);
 void set_afsk_data(const uint32_t afsk_samples_per_bit, const uint32_t afsk_phase_inc_mark, const uint32_t afsk_phase_inc_space, const uint8_t afsk_repeat, const uint32_t afsk_bw, const uint8_t symbol_count);
@@ -110,7 +110,7 @@ void set_siggen_config(const uint32_t bw, const uint32_t shape, const uint32_t d
 void set_spectrum_painter_config(const uint16_t width, const uint16_t height, bool update, int32_t bw);
 void set_subghzd_config(uint8_t modulation, uint32_t sampling_rate);
 void set_moreserx_config(uint8_t mode);
-void set_tonedetect_config(uint8_t squelch, uint32_t ctcss_freq_x10 = 0);
+void set_tonedetect_config(uint8_t squelch, uint32_t ctcss_freq_x10 = 0, uint32_t dtcs_word = 0, bool dtcs_reverse = false);
 void set_morsetx_config(uint8_t mode, uint32_t tone, float fm_delta);
 void set_morsetx_key(bool key_down);
 void set_wefax_config(uint8_t lpm, uint8_t ioc);

@@ -28,6 +28,28 @@
 #include "audio_dma.hpp"
 
 #include <cstdint>
+#include <algorithm>
+
+void MicTXProcessor::mix_dtcs(buffer_s16_t& buffer) {
+    if (dtcs_word == 0) return;
+
+    constexpr float BIT_RATE = 134.4f;
+    constexpr float AUDIO_RATE = 24000.0f;
+    constexpr int32_t DTCS_AMPLITUDE = 3000;
+
+    for (size_t i = 0; i < buffer.count; i++) {
+        const bool bit = ((dtcs_word >> dtcs_bit_index) & 1U) != 0;
+        const bool level = bit ^ dtcs_reverse;
+        const int32_t mixed = static_cast<int32_t>(buffer.p[i]) + (level ? DTCS_AMPLITUDE : -DTCS_AMPLITUDE);
+        buffer.p[i] = static_cast<int16_t>(std::clamp(mixed, -32768, 32767));
+
+        dtcs_bit_phase += BIT_RATE / AUDIO_RATE;
+        if (dtcs_bit_phase >= 1.0f) {
+            dtcs_bit_phase -= 1.0f;
+            dtcs_bit_index = (dtcs_bit_index + 1) % 23;
+        }
+    }
+}
 
 void MicTXProcessor::execute(const buffer_c8_t& buffer) {
     // This is called at 1536000/2048 = 750Hz
@@ -35,6 +57,7 @@ void MicTXProcessor::execute(const buffer_c8_t& buffer) {
     if (!configured) return;
 
     audio_input.read_audio_buffer(audio_buffer);
+    mix_dtcs(audio_buffer);
     modulator->set_gain_shiftbits_vumeter_beep(audio_gain, audio_shift_bits_s16, play_beep);
     modulator->execute(audio_buffer, buffer, configured, beep_index, beep_timer, txprogress_message, level_message, power_acc_count, divider);  // Now "Key Tones & CTCSS" baseband additon inside FM mod. dsp_modulate.cpp"
 
@@ -161,6 +184,10 @@ void MicTXProcessor::on_message(const Message* const msg) {
             audio_gain = config_message.audio_gain;
             audio_shift_bits_s16 = config_message.audio_shift_bits_s16;
             divider = config_message.divider;
+            dtcs_word = config_message.dtcs_word & 0x007FFFFF;
+            dtcs_reverse = config_message.dtcs_reverse;
+            dtcs_bit_index = 0;
+            dtcs_bit_phase = 0.0f;
             power_acc_count = 0;
 
             // now this config  moved, in the case Message::ID::AudioTXConfig , only FM case.

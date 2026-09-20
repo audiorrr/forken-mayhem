@@ -67,10 +67,17 @@ class MicTXProcessor : public BasebandProcessor {
     int32_t sample{0}, delta{};
     uint32_t beep_index{}, beep_timer{};
 
+    uint32_t dtcs_word{0};
+    bool dtcs_reverse{false};
+    uint8_t dtcs_bit_index{0};
+    float dtcs_bit_phase{0.0f};
+
     int8_t re{0}, im{0};
 
     AudioLevelReportMessage level_message{};
     TXProgressMessage txprogress_message{};
+
+    void mix_dtcs(buffer_s16_t& buffer);
 
     /* NB: Threads should be the last members in the class definition. */
     BasebandThread baseband_thread{baseband_fs, this, baseband::Direction::Transmit};

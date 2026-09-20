@@ -41,7 +41,7 @@ class ToneDetectProcessor : public BasebandProcessor {
     void on_message(const Message* const p) override;
 
    private:
-    void configure(uint8_t squelch, uint32_t ctcss_freq_x10);
+    void configure(uint8_t squelch, uint32_t ctcss_freq_x10, uint32_t dtcs_word, bool dtcs_reverse);
 
     BasebandThread baseband_thread{3072000, this, baseband::Direction::Receive};
     RSSIThread rssi_thread{};
@@ -80,6 +80,17 @@ class ToneDetectProcessor : public BasebandProcessor {
     uint32_t window_sample_count{0};
     bool was_ctcss_detected{false};
     uint32_t tone_duration_windows{0};
+
+    // DTCS decoder: 23-bit word at 134.4 baud, sampled from demodulated audio.
+    uint32_t dtcs_word{0};
+    bool dtcs_reverse{false};
+    uint32_t dtcs_shift_register{0};
+    uint8_t dtcs_bits_collected{0};
+    float dtcs_bit_phase{0.0f};
+    float dtcs_bit_integral{0.0f};
+    uint8_t dtcs_matching_words{0};
+    uint8_t dtcs_hold_windows{0};
+    bool dtcs_match_in_window{false};
 
     // MOTO frequency bank — one Goertzel filter per MOTO table entry.
     // States reset each window; coefficients set once in configure().
